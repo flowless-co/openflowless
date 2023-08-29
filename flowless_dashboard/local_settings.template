@@ -1,0 +1,80 @@
+import os
+import datetime as dt
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+SECRET_KEY = 'MySecretKey'
+DEBUG = False
+ALLOWED_HOSTS = ['.domain.com']
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+
+        'ENGINE': 'tenant_schemas.postgresql_backend',
+        'NAME': 'DatabaseName',
+        'USER': 'user',
+        'PASSWORD': 'pass',
+        'HOST': 'domain.com',
+        'PORT': '5432',
+    }
+}
+
+MNF_START = dt.time(2, 0, 0)
+MNF_END = dt.time(4, 0, 0)
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+RIE = 15
+
+TIME_ZONE = 'America/Chicago'
+CELERY_BROKER_URL = 'redis://localhost:6379'
+
+X_LOGGING_DIR = os.path.join(BASE_DIR, 'logs')
+sentry_sdk.init(
+	# Add URL of Sentry!
+    dsn=,
+    integrations=[
+        DjangoIntegration(),
+        LoggingIntegration(
+            level=20,          # INFO and above captured as breadcrumbs
+            event_level=30     # WARNINGs will be reported as events to sentry web platform
+        ),
+    ],
+    send_default_pii=True,
+)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '%(name)s %(levelname)s %(message)s',
+        },
+        'verbose': {
+            'format': '%(asctime)s|%(name)-s|%(levelname)s -- %(message)s -- FUNC:%(funcName)s|LINE:%(lineno)d|PROC:%(process)d|THRD:%(thread)d',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'op_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': X_LOGGING_DIR + '/operations.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10MB
+            'backupCount': 10,
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['op_file'],
+            'level': 'INFO',
+        },
+    },
+}

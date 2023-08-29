@@ -1,0 +1,12 @@
+# in plural form
+components = ['transmission_lines', 'flow_meters', 'pressure_sensors', 'tank_level_sensors']
+
+overview_report = {
+    'pies': ['network_input_today', 'zone_consumption_today'],
+                                                    # narrated_zone_consumption is required
+    'narration_charts': ['narrated_network_input', 'narrated_zone_consumption']
+}
+
+dashboard_stats = {
+    'include_zones': '__all__',  # [1, 2]
+}

@@ -1,0 +1,265 @@
+{% extends 'fl_dashboard/dashboard/base.html' %}
+{% load staticfiles %}
+
+{% block title %}Flow Pulses History{% endblock title %}
+
+{% block styles %}
+    {{ block.super }}
+    <style>
+        abbr[title]{
+            text-decoration: none !important;
+        }
+    </style>
+{% endblock %}
+
+{% block content-title %}Flow Pulses History{% endblock %}
+
+{% block content %}
+    <!-- Datatable -->
+
+    {# Filtering #}
+
+    <div class="card shadow mb-5">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Pulses History</h6>
+        </div>
+
+        <div class="card-body">
+
+            <div class="bg-gray-100 border d-flex justify-content-between mb-4 p-2 rounded">
+
+
+                <div class="d-flex" style="min-width: 550px">
+                    <label class="m-0 mx-2 align-self-center w-100">Time Period: From</label>
+                    <input type="date" class="form-control" id="filterSinceDate">
+
+                    <label class="m-0 mx-2 align-self-center">To</label>
+                    <input type="date" class="form-control" id="filterUntilDate">
+
+                </div>
+
+                <button class="mx-2 btn btn-primary" id="filterSubmit">Go</button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-bordered dataTable" id="dataTable" width="100%" cellspacing="0" role="grid" style="width: 100%;">
+                    <thead>
+                        <tr role="row">
+                            <th class="sorting_asc">Pulse Time</th>
+                            <th class="">Reading <small>m<sup>3</sup></small></th>
+                            <th class="">Meter Key</th>
+                            <th class="">Input Zone</th>
+                            <th class="">Output Zone</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Flow Meter Narrated History</h6>
+        </div>
+
+        <div class="card-body">
+            <div class="bg-gray-100 border d-flex justify-content-between mb-4 p-2 rounded">
+                <div class="d-flex flex-grow-1">
+                    <div class="d-flex">
+                        <label class="m-0 mx-2 align-self-center w-100">Select Meter</label>
+                        <select class="form-control" id="MeterNarration-meterFilter" style="min-width: 150px">
+                            <option selected value=""></option>
+                            {% for meter in meters %}
+                                <option value="{{meter.id}}">{{meter.key}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="d-flex ml-5">
+                        <label class="m-0 mx-2 align-self-center w-100">Time Period: From</label>
+                        <input type="date" class="form-control" id="MeterNarration-fromFilter">
+
+                        <label class="m-0 mx-2 align-self-center">To</label>
+                        <input type="date" class="form-control" id="MeterNarration-toFilter">
+                    </div>
+
+                </div>
+
+                <button class="ml-2 btn btn-primary" id="MeterNarration-submitButton">Go</button>
+            </div>
+
+            <div>
+                <canvas id="MeterNarration-narrationCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {{ block.super }}
+    <script src="{% static 'fl_dashboard/vendor/datatables/jquery.dataTables.min.js' %}"></script>
+    <script src="{% static 'fl_dashboard/vendor/datatables/dataTables.bootstrap4.min.js' %}"></script>
+    <script src="{% static 'fl_dashboard/vendor/chart.js/Chart.min.js' %}"></script>
+    <script>
+        Date.prototype.toISODate = (function() {
+            var local = new Date(this);
+            return local.toISOString().slice(0, 10);
+        });
+
+        const filterSubmit = $("#filterSubmit");
+        const filterSince = $("#filterSinceDate");
+        const filterUntil = $("#filterUntilDate");
+        const dataTableElem = $("#dataTable");
+        var dataTableObj;
+
+        getSinceFilter = () => moment.utc(filterSince.val()).toISOString();
+        getUntilFilter = () => moment.utc(filterUntil.val()).toISOString();
+
+        // declarations of namespaces
+        const Urls = {
+            pulsesHistory: '/api/pulses-history/flow/',
+            meterNarration: '/api/flow-meter/narrate',
+        };
+
+        const MeterNarration = {
+            domElement:{
+                meterFilter: $('#MeterNarration-meterFilter'),
+                fromFilter: $('#MeterNarration-fromFilter'),
+                toFilter: $('#MeterNarration-toFilter'),
+                submitButton: $('#MeterNarration-submitButton'),
+                canvas: $('#MeterNarration-narrationCanvas'),
+            },
+            chartObj: null
+        };
+
+        $(function(){
+            let todayISO = moment.tz(SERVER_TIMEZONE).toISODate();
+
+            filterSince.val(todayISO);
+            filterUntil.val(todayISO);
+
+            fetchData(Urls.pulsesHistory, todayISO, todayISO).then(data=>renderData(data));
+
+            filterSubmit.on('click', () => {
+                fetchData(Urls.pulsesHistory, getSinceFilter(), getUntilFilter())
+                    .then(response => {
+                        if (response.data.length === 0)
+                            alert('Selected time period has no pulses');
+                        else if (response.data.length > 0)
+                            renderData(response);
+                        else
+                            alert('Unknown server response. Check console log for more info');
+                    })
+                    .catch(
+                        err => alert(`Server error: ${err.responseText}`)
+                    );
+            });
+
+            function renderData(dataSet){
+                if (dataTableObj)
+                    dataTableObj.destroy();
+
+                dataTableObj = dataTableElem.DataTable({
+                    data: dataSet['data'],
+                    columns: [
+                        {
+                            data: "time",
+                            render: (data, type, row) => `<span style="display:none;">${row.timestamp}</span>${row.time}`,
+                        },
+                        {
+                            data: "reading",
+                            render: (data, type, row) => `<abbr title="Raw Reading: ${row.raw_reading}">${row.reading}</abbr>`
+                        },
+                        { data: "meter_key" },
+                        { data: "input_zone_name" },
+                        { data: "output_zone_name" },
+                    ]
+                });
+            }
+            async function fetchData(url, since, until){
+                return $.ajax({
+                    url: url,
+                    method: 'GET',
+                    data: {since: since, until: until},
+                    success: response => console.log('Data has been fetched: ', response)
+                })
+            }
+        });
+
+        MeterNarration.domElement.submitButton.on('click', function (e) {
+            let meterID = MeterNarration.domElement.meterFilter.val();
+            let fromDateISO = MeterNarration.domElement.fromFilter.val();
+            let toDateISO = MeterNarration.domElement.toFilter.val();
+
+            if (![fromDateISO, toDateISO, meterID].every(x=>!!x)){
+                alert("All filters must have valid values.");
+                return;
+            }
+
+            {#let serverOffset = moment.tz(SERVER_TIMEZONE).format("Z");#}
+            let serverOffset = "+00:00";
+
+            $.ajax({
+                url: Urls.meterNarration,
+                method: 'get',
+                data: {
+                    from: fromDateISO + "T00:00" + serverOffset,
+                    to: toDateISO + "T23:59" + serverOffset,
+                    meters: [meterID, 2, 3]
+                },
+                success: function(response){
+                    response = JSON.parse(response);
+
+                    datapointsLabels = [];
+                    datapointsValues = [];
+                    for(let datapoint of response){
+                        datapointsLabels.push(new Date(datapoint.time));
+                        datapointsValues.push(Helper.round(datapoint.reading));
+                    }
+                    if(MeterNarration.chartObj)
+                        MeterNarration.chartObj.destroy();
+                    MeterNarration.chartObj = new Chart(MeterNarration.domElement.canvas[0], {
+                        type: 'line',
+                        data: {
+                            labels: datapointsLabels,
+                            datasets: [{
+                                label: 'Flow Rate',
+                                data: datapointsValues,
+                                fill: false,
+                                backgroundColor: '#' + CYCLABLE_COLORS.blues[0],
+                                borderColor: '#' + CYCLABLE_COLORS.blues[0],
+                                cubicInterpolationMode: 'monotone',
+                            }]
+                        },
+                        options: {
+                            maintainAspectRatio: false,
+                            responsive: true,
+                            legend: { display: false },
+                            title: {
+                                display: true,
+                                text: "Flow Rate (m3)",
+                                position: 'left'
+                            },
+                            scales: {
+                                xAxes:[{
+                                    type: 'time'
+                                }],
+                                yAxes: [{
+                                    ticks: {
+                                        maxTicksLimit: 7,
+                                    },
+                                }]
+                            }
+                        }
+                    });
+
+                    console.log(response);
+                },
+                error: function(a,b,c){
+                    console.error(a,b,c);
+                }
+            });
+        })
+    </script>
+{% endblock %}

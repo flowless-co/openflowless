@@ -1,0 +1,91 @@
+{% extends 'fl_dashboard/dashboard/base.html' %}
+{% load staticfiles %}
+
+{% block title %}Overview Reports{% endblock title %}
+
+{% block content-title %}Overview{% endblock %}
+
+{% block content %}
+    <!-- Consumption Row -->
+    <div class="row">
+
+        <!-- Overview Charts -->
+        <div class="col-sm-12 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <span class="h5 font-weight-bold text-center mb-4">Chlorine Level Chart</span>
+
+                    <div class="chart-canvas-container">
+                        <canvas id="ChlorineLevelCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {{ block.super }} {# block.super renders all the necessary scripts from base.html #}
+    <script src="{% static 'fl_dashboard/vendor/chart.js/Chart.min.js' %}"></script>
+
+    <script>
+        let until = getNow();
+        let since = getNow().subtract(12, 'hours');
+        $.ajax({
+            url: '{% url 'narrated-chlorine-levels' %}',
+            method: 'post',
+            data: JSON.stringify({
+                since: since,
+                until: until,
+                res: 'hours',
+                sensors: 1
+            }),
+            contentType: 'application/json',
+            success: response => {
+                response = JSON.parse(response);
+                console.log('RECEIVED {% url 'narrated-chlorine-levels' %}', response);
+
+                new Chart($('#ChlorineLevelCanvas')[0], {
+                    type: 'line',
+                    data: {
+                        labels: Object.keys(response),
+                        datasets: [{
+                            label: '',
+                            data: Object.values(response),
+                            fill: false,
+                            backgroundColor: '#' + CYCLABLE_COLORS.blues[0],
+                            borderColor: '#' + CYCLABLE_COLORS.blues[0],
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Chlorine Levels',
+                            position: 'left'
+                        },
+                        scales: {
+                            xAxes:[{
+                                type: 'time'
+                            }],
+                            yAxes: [{
+                                ticks: {
+                                    maxTicksLimit: 7,
+                                },
+                            }]
+                        }
+                    }
+                });
+            },
+            error: error => {
+                console.error(error);
+            }
+        })
+
+    </script>
+{% endblock %}

@@ -1,0 +1,219 @@
+{% extends 'fl_dashboard/dashboard/base.html' %}
+{% load staticfiles %}
+
+{% block title %}Detailed Consumption{% endblock title %}
+
+{% block content-title %}Daily Reports{% endblock %}
+
+{% block content %}
+
+    <!-- At A Glace Row -->
+    <div class="row">
+
+        <!-- TODAY'S CONSUMPTION -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="font-weight-bold text-primary text-uppercase" style="line-height: 1em">
+                                Today's Consumption
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800 mt-2">
+                                {{ today_consumption }} m<sup>3</sup></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-pie fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DAILY AVERAGE -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="font-weight-bold text-primary text-uppercase" style="line-height: 1em">
+                                Today's Average
+                                <br><i class="text-xs">(Of week)</i>
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800 mt-2">{{ today_avg }}m<sup>3</sup></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-fa-calendar-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DAILY AVERAGE -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="font-weight-bold text-primary text-uppercase" style="line-height: 1em">
+                                Yesterday's loss
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800 mt-2">
+                                {{ yesterday_loss }} m<sup>3</sup>
+                                {% if yesterday_loss_percentage !=  None %}
+                                    <i><small>{{ yesterday_loss_percentage }}</small></i>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-align-center fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Stats Row -->
+    <div class="row">
+        {# Filtering #}
+        <div class="col-12 mb-2">
+            <div class="card shadow">
+                <div class="card-body d-flex justify-content-between">
+                    <span class="align-self-center">Select Report's Date:</span>
+
+                    <div class="d-flex" style="min-width: 220px">
+
+                        <label id="FilterReportDateLabel" class="m-0 mx-2 align-self-center">Date</label>
+                        <input id="FilterReportDate" type="date" class="form-control" />
+
+                        <span class="mx-1"></span>
+                        <button class="btn btn-primary" id="FilterReportButton">Go</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PIE CHART -->
+        <div class="col-xl-6 col-lg-6 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <dt class="h5 font-weight-bold text-center mb-4">Per Zone Consumption</dt>
+                    <div style="min-height: 600px;">
+                        <canvas id="PieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STACKED BAR CHART -->
+        <div class="col-xl-6 col-lg-6 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <dt class="h5 font-weight-bold text-center mb-4">Weekly Consumption</dt>
+                    <div style="min-height: 600px;">
+                        <canvas id="StackedBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- HORIZONTAL BAR CHART -->
+        <div class="col-sm-12 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <dt class="h5 font-weight-bold text-center mb-4">Zone Consumption Analysis</dt>
+                    <div style="min-height: 600px;">
+                        <canvas id="HBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Datatable -->
+    {% comment %}<div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">Consumption Overview</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered dataTable" id="dataTable" width="100%" cellspacing="0" role="grid"
+                       style="width: 100%;">
+
+                    <thead>
+                    <tr role="row">
+                        <th class="sorting_asc">Meter Key</th>
+                        <th class="sorting_asc">Customer Name</th>
+                        <th class="sorting_asc">Last Reading</th>
+                        <th class="sorting_asc">Last Reading Time</th>
+                        <th class="sorting_asc">Previous Reading</th>
+                        <th class="sorting_asc">Previous Reading Time</th>
+                        <th class="sorting_asc">Consumption</th>
+                        <th class="sorting_asc">Avg. Consumption</th>
+                        <th class="sorting_asc">Alerts No.</th>
+                    </tr>
+                    </thead>
+
+                    <tbody></tbody>
+
+                </table>
+            </div>
+        </div>
+    </div>{% endcomment %}
+{% endblock %}
+
+{% block scripts %}
+    {{ block.super }}
+    <script src="{% static 'fl_dashboard/vendor/chart.js/Chart.min.js' %}"></script>
+    <script src="{% static 'fl_dashboard/js/demo/daily-reports.js' %}"></script>
+    <script src="{% static 'fl_dashboard/vendor/datatables/jquery.dataTables.min.js' %}"></script>
+    <script src="{% static 'fl_dashboard/vendor/datatables/dataTables.bootstrap4.min.js' %}"></script>
+
+    <script>
+        /** Data table */
+        {% comment %}$('#dataTable').DataTable({
+            'ajax': {
+                url: '/api/detailed-meters-consumption/?format=json',
+                method: "GET",
+            },
+            columns: [
+                {data: "meter_key"},
+                {data: "customer_name"},
+                {data: "last_reading"},
+                {data: "last_time"},
+                {data: "previous_reading"},
+                {data: "previous_time"},
+                {data: "consumption"},
+                {data: "average_consumption"},
+                {data: "alerts_no"},
+            ],
+            rowCallback: function (row, data, index) {
+                if (data.status == "Not Handled") {
+                    $('td', row).addClass('row-danger');
+                }
+                else{
+                                $('td', row).addClass('row-success');
+                            }
+            },
+        });{% endcomment %}
+
+        $(function () {
+            if(notOnServerTimezone)
+                addServerOffsetToLabel($("#FilterReportDateLabel"));
+
+            const $dateInput = $("#FilterReportDate");
+            $dateInput.val(serverNow().toISODate());
+            document.getElementById("FilterReportButton").addEventListener('click', () => {
+                renderCharts($dateInput.val());
+            });
+            renderCharts(serverNow().toISODate());
+        });
+    </script>
+{% endblock %}

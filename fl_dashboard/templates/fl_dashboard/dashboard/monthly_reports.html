@@ -1,0 +1,164 @@
+{% extends 'fl_dashboard/dashboard/base.html' %}
+{% load staticfiles %}
+
+{% block title %}Consumption Overview{% endblock title %}
+
+{% block content-title %}Monthly Reports{% endblock %}
+
+{% block content %}
+
+    <!-- At A Glace Row -->
+    <div class="row">
+
+        <!-- MONTH'S CONSUMPTION -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="font-weight-bold text-primary text-uppercase" style="line-height: 1em">
+                                Consumption
+                                <br><i class="text-xs">This month</i>
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800 mt-2">{{month_consumption}} m<sup>3</sup></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-pie fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LEAKS -->
+        <div class="col-lg-4 mb-4">
+            <a class="card border-left-danger shadow h-100 py-2" href="{% url 'dashboard:alerts' %}">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="font-weight-bold text-danger text-uppercase" style="line-height: 1em">
+                                Burst alerts
+                                <br><i class="text-xs">This month</i>
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800 mt-2">{{burst_alerts}}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- NRW % -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="font-weight-bold text-warning text-uppercase" style="line-height: 1em">
+                                Non-revenue water
+                                <br><i class="text-xs">This month</i>
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800 mt-2">{{month_nrw_percentage}}%</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-water fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Stats Row -->
+    <div class="row">
+        <div class="col-12 mb-2">
+            <div class="card shadow">
+                <div class="card-body d-flex justify-content-between">
+                    <span class="align-self-center">Select Report's Month:</span>
+
+                    <div class="d-flex" style="min-width: 400px">
+                        <label class="m-0 mx-2 align-self-center">Year</label>
+                        <select class="form-control" id="FilterReportYear">
+                            <option value="2020" selected>2020</option>
+                        </select>
+
+                        <span class="mx-2"></span>
+
+                        <label class="m-0 mx-2 align-self-center">Month</label>
+                        <select class="form-control" id="FilterReportMonth">
+                            {% for i in list_of_months %}
+                                <option value="{{ i }}" {% if i == month %}selected{% endif %}>{{ i }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <span class="mx-1"></span>
+                        <button class="btn btn-primary" id="FilterReportButton">Go</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PIE CHART / Zonal Consumption -->
+        <div class="col-xl-6 col-lg-6 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <dt class="h5 font-weight-bold text-center mb-4">Zonal Consumption</dt>
+                    <div style="min-height: 600px;">
+                        <canvas id="PieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STACKED BAR CHART / Leaks Per Zone -->
+        <div class="col-xl-6 col-lg-6 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <dt class="h5 font-weight-bold text-center mb-4">Leaks Per Zone</dt>
+                    <div style="min-height: 600px;">
+                        <canvas id="StackedBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- HORIZONTAL BAR CHART / Zonal Consumption Against NRW -->
+        <div class="col-sm-12 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <dt class="h5 font-weight-bold text-center mb-4">Zonal Consumption Against NRW</dt>
+                    <div style="min-height: 600px;">
+                        <canvas id="HBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {{ block.super }}
+    <script src="{% static 'fl_dashboard/vendor/chart.js/Chart.min.js' %}"></script>
+    <script src="{% static 'fl_dashboard/vendor/chartjs-plugins/datalabels-plugin.js' %}"></script>
+    <script src="{% static 'fl_dashboard/js/demo/monthly-reports.js' %}"></script>
+    <script src="{% static 'fl_dashboard/vendor/datatables/jquery.dataTables.min.js' %}"></script>
+    <script src="{% static 'fl_dashboard/vendor/datatables/dataTables.bootstrap4.min.js' %}"></script>
+
+    <script>
+        let yearSelector = document.getElementById("FilterReportYear");
+        let monthSelector = document.getElementById("FilterReportMonth");
+
+        document.getElementById("FilterReportButton").addEventListener('click', () => {
+            console.log("BUTTON CLICKED", yearSelector.value, monthSelector.value);
+            renderCharts(yearSelector.value, monthSelector.value);
+        });
+
+        renderCharts(new Date().getUTCFullYear(), new Date().getUTCMonth()+1);
+    </script>
+
+{% endblock %}

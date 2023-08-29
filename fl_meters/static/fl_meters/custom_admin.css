@@ -1,0 +1,20 @@
+.inline-group .tabular tr.has_original td.field-latitude, .inline-group .tabular tr td{
+    padding-top: 10px !important;
+}
+
+.inline-group .tabular tr td.original, .inline-group .tabular th.original{
+    display: none;
+}
+
+.trgr {
+    background: url(../img/icon-addlink.svg) 0 1px no-repeat;
+    padding-left: 16px;
+    font-size: 12px;
+    color: #447e9b;
+    text-decoration: none;
+}
+
+.trgr:hover {
+    color: #036;
+    cursor: pointer;
+}

@@ -1,0 +1,365 @@
+{% extends 'fl_dashboard/dashboard/base.html' %}
+{% load staticfiles %}
+
+{% block title %}Home{% endblock title %}
+
+{% block content-title %}Dashboard{% endblock %}
+
+{% block styles %}
+<style>
+    #map {
+        width: 100%;
+        min-height: 500px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+    <!-- At A Glace Row -->
+    <div class="row">
+
+      <!-- PERCENTAGE OF RECEIVED SIGNALS -->
+      <div class="col-lg-4 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+          <div class="card-body">
+            <div class="row no-gutters align-items-center">
+              <div class="col mr-2">
+                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                  Percentage of Received Pulses<br>(Last Hour)
+                </div>
+                <div class="row no-gutters align-items-center">
+                  <div class="col-auto">
+                    <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">{{ received_signals_percentage }}</div>
+                  </div>
+                  <div class="col">
+                    <div class="progress progress-sm mr-2">
+                      <div class="progress-bar bg-success" role="progressbar"
+                           style="width: {{ received_signals_percentage }}"
+                           aria-valuenow="78.6" aria-valuemin="0" aria-valuemax="100">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-auto">
+                <i class="fas fa-satellite-dish fa-2x text-gray-300"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LAST DAY LEAKAGE -->
+      <div class="col-lg-4 mb-4">
+        <a class="card border-left-primary shadow h-100 py-2" href="{% url 'dashboard:bulk_consumption' %}">
+          <div class="card-body">
+            <div class="row no-gutters align-items-center">
+              <div class="col mr-2">
+                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                  Today's Consumption<br>({{ n_zones }} Zone{% if n_zones != 1 %}s{% endif %})
+                </div>
+                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ today_consumption }} m<sup>3</sup></div>
+              </div>
+              <div class="col-auto">
+                <i class="fas fa-chart-area fa-2x text-gray-300"></i>
+              </div>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="col-lg-4 mb-4">
+        <a class="card border-left-danger shadow h-100 py-2" href="{% url 'dashboard:alerts' %}">
+          <div class="card-body">
+            <div class="row no-gutters align-items-center">
+              <div class="col mr-2">
+                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                  <span>Alerts</span>
+                </div>
+                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                    {% if alert_notifications == 0 %}
+                        No New Alerts
+                    {% elif alert_notifications == 1 %}
+                        1 New Alert
+                    {% else %}
+                        {{ alert_notifications }} New Alerts
+                    {% endif %}
+                </div>
+              </div>
+              <div class="col-auto">
+                <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
+              </div>
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Consumption Row -->
+    <div class="row">
+
+        <!-- Consumption Chart -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <!-- Card Header - Dropdown -->
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Hourly Flow Overview</h6>
+                    {% comment %}
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink"
+                           data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                             aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Dropdown Header:</div>
+                            <a class="dropdown-item" href="#">Action</a>
+                            <a class="dropdown-item" href="#">Another action</a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="#">Something else here</a>
+                        </div>
+                    </div>
+                    {% endcomment %}
+                </div>
+                <!-- Card Body -->
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="myAreaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Consumption Statistics -->
+        <div class="col-xl-4 col-lg-5 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <!-- Card Header - Dropdown -->
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Consumption Statistics</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink"
+                           data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                             aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Dropdown Header:</div>
+                            <a class="dropdown-item" href="#">Action</a>
+                            <a class="dropdown-item" href="#">Another action</a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="#">Something else here</a>
+                        </div>
+                    </div>
+                </div>
+                <!-- Card Body -->
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <div>
+                        <span class="pull-right">
+                            <i class="fas fa-tachometer-alt fa-2x text-gray-300"></i>
+                        </span>
+                        <dl>
+                            <dt class="h5 font-weight-bold">Accumulative Consumption</dt>
+                            <dd class="mb-1 ml-1">Today's: {{ today_consumption }} m³</dd>
+                            <dd class="mb-1 ml-1">Yesterday's: {{ yesterday_consumption }} m³</dd>
+                            <dd class="mb-1 ml-1">This Month's: {{ month_consumption }} m³</dd>
+                            <dt class="mt-3 h5 font-weight-bold">Average Consumption</dt>
+                            <dd class="mb-1 ml-1">Average Daily: {{ daily_avg_consumption }} m³</dd>
+                            <dd class="mb-1 ml-1">Average Monthly: {{ monthly_avg_consumption }} m³</dd>
+                        </dl>
+                    </div>
+                    <span><a href="{% url 'dashboard:detailed_consumption' %}">Customers Consumption</a></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overview Map -->
+        <div class="col-sm-12 d-flex">
+          <div class="card shadow mb-4 flex-fill">
+            <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+              <span class="h5 font-weight-bold text-center mb-4">Map Overview</span>
+              <div id="map"></div>
+            </div>
+          </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }} {# block.super renders all the necessary scripts from base.html #}
+<script src="{% static 'fl_dashboard/vendor/chart.js/Chart.min.js' %}"></script>
+<script src="{% static 'fl_dashboard/js/demo/dashboard-chart-bar.js' %}"></script>
+<script src="{% static 'fl_dashboard/vendor/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'fl_dashboard/vendor/datatables/dataTables.bootstrap4.min.js' %}"></script>
+
+<script src="https://maps.googleapis.com/maps/api/js"></script>
+<script>
+  /** Google Map */
+  let MAP;
+  let positions = {
+    qCenter: {lat: 32.0127145, lng: 35.1908548},
+    salfit: {lat: 32.084924, lng: 35.180775},
+    horseshoeTop: {lat: 32.012662, lng: 35.190096}
+  };
+  let zones_old = {
+    horseshoe: [
+      {lat: 32.010212, lng: 35.189781},
+      {lat: 32.010309, lng: 35.190241},
+      {lat: 32.010260, lng: 35.190688},
+      {lat: 32.011212, lng: 35.190943},
+      {lat: 32.011878, lng: 35.190973},
+      {lat: 32.012340, lng: 35.190799},
+      {lat: 32.012613, lng: 35.190179}, // horseshoeTop
+      {lat: 32.012230, lng: 35.189478},
+      {lat: 32.011973, lng: 35.189376},
+      {lat: 32.011973, lng: 35.189376},
+      {lat: 32.011973, lng: 35.189376},
+      {lat: 32.011973, lng: 35.189376},
+      {lat: 32.011150, lng: 35.189389},
+    ],
+    uptown: []
+  };
+  let zones = {};
+  let metersData = [];
+  let transmittersData = [];
+  let markersObjects = []; // { marker, infoWindow }
+  let viewModel = {
+            'mapCenterLat': 0.0,
+            'mapCenterLng': 0.0,
+            'mapZoomLevel': 15,
+            'mapTypeId': 'roadmap',
+        };
+
+  // fetch meters information
+  $.ajax({
+    url: "/api/meters-list/?format=json&onlyWithCoords=1",
+    success: jsonData => {
+      metersData = jsonData.data;
+      console.log(metersData);
+      setTimeout(() => createMarkersForMeters(), 500);
+    }
+  });
+  // fetch transmitters information
+  $.ajax({
+    url: "/api/transmitters-list/?format=json&onlyWithCoords=1",
+    success: jsonData => {
+      transmittersData = jsonData.data;
+      setTimeout(() => createMarkersForTransmitters(), 500);
+    }
+  });
+
+  // fetch dashboard map settings
+  $.ajax({
+    url: "/dashboard/viewmodel",
+    success: jsonData => {
+      viewModel = jsonData;
+      console.log('viewModel', viewModel);
+      initMap();
+    }
+  });
+
+  // fetch zones information
+  $.ajax({
+    url: "/api/zones/?format=json",
+    success: jsonData => {
+      zones = jsonData.data;
+    }
+  });
+
+  function makeInfoWindow(device_type, key, link) {
+    return new google.maps.InfoWindow({
+      content:
+        `<small>${device_type}</small> <br>` +
+        `<b class="iw-title">${key}</b> <br><br>` +
+        `<a style="text-decoration: underline; font-size:90%;" href="${link.url}">${link.text}</a>`
+    });
+  }
+
+  function makeMarker(position, iconUrl = null) {
+    let options = {
+      position: position,
+      map: MAP,
+
+    };
+    if(iconUrl){
+      Object.assign(options, {
+        icon: {
+          url: iconUrl
+        }
+      })
+    }
+
+    return new google.maps.Marker(options);
+  }
+
+  function createMarkersForMeters() {
+    for (let meter of metersData) {
+      let marker = makeMarker({lat: parseFloat(meter.lat), lng: parseFloat(meter.lng)});
+      let infoWindow = makeInfoWindow('Flow Meter', meter.meter_key, {text: "Latest Pulses", url:"{% url 'dashboard:bulk_consumption' %}"});
+
+      marker.addListener('click', function (event) {
+        console.log(event, this);
+        infoWindow.open(MAP, marker);
+      });
+
+      markersObjects.push({marker: marker, infoWindow: infoWindow})
+    }
+  }
+
+  function createMarkersForTransmitters() {
+    for (let meter of transmittersData) {
+      let marker = makeMarker(
+          {lat: parseFloat(meter.lat), lng: parseFloat(meter.lng)},
+          "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+      );
+      let infoWindow = makeInfoWindow('Pressure Sensor', meter.meter_key, {text: "Latest Pulses", url: "{% url 'dashboard:pressure_readings' %}"});
+
+      marker.addListener('click', function (event) {
+        console.log(event, this);
+        infoWindow.open(MAP, marker);
+      });
+
+      markersObjects.push({marker: marker, infoWindow: infoWindow})
+    }
+  }
+
+  function initMap() {
+    MAP = new google.maps.Map(document.getElementById('map'), {
+      center: {lat: viewModel.mapCenterLat, lng: viewModel.mapCenterLng},
+      zoom: viewModel.mapZoomLevel,
+      mapTypeId: viewModel.mapTypeId,
+      styles: [{
+        featureType: "poi",
+        stylers: [{visibility: "off"}]
+      }]
+    });
+
+    MAP.addListener('click', function (e) {
+      console.log(MAP, e);
+    });
+
+    // Construct the zones' polygons.
+    setTimeout(() => {
+      for (let zone_json of zones) {
+        console.log(zone_json);
+        let zone_obj = new google.maps.Polygon({
+          paths: zone_json.coords,
+          strokeColor: zone_json.hex_color,
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: zone_json.hex_color,
+          fillOpacity: 0.35,
+        });
+        zone_obj.setMap(MAP);
+      }
+    }, 1000);
+  }
+</script>
+
+<script>
+    (function () {
+        renderCharts();
+    })();
+</script>
+{% endblock %}

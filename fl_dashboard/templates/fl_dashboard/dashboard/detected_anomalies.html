@@ -1,0 +1,191 @@
+{% extends 'fl_dashboard/dashboard/base.html' %}
+{% load staticfiles %}
+
+{% block title %}Anomalies Report{% endblock title %}
+
+{% block content-title %}Detected Anomalies{% endblock %}
+
+{% block styles %}
+    <style>
+        .chart-grid{
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+        .chart-grid .chart-grid-item{
+            flex: 1 0 260px;
+            display: flex;
+            flex-direction: column;
+            max-width: 500px;
+            min-height: 400px;
+        }
+        .chart-grid .chart-grid-item.fill{
+            flex:0 1 90%;
+            max-width: unset;
+            margin-top: 3em;
+        }
+        .chart-grid .chart-grid-item .chart-canvas-container{
+            flex-grow:1;
+            display: flex;
+        }
+        .chart-canvas-container canvas{
+            min-height: 200px;
+        }
+        .spinner-container {
+            /* display: none; */
+            background-color: rgb(255, 255, 255, 0.67);
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            display: flex;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <!-- Consumption Row -->
+    <div class="row">
+        <span id="SpinnerContainer" class="spinner-container">
+            <span id="Spinner"></span>
+        </span>
+
+        <!-- Overview Charts -->
+        <div class="col-sm-12 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <span class="h5 font-weight-bold text-center mb-4">Detected Anomalies Charts</span>
+                    <div id="OverviewChartsGrid" class="chart-grid" style="min-height: 500px">
+
+                        <!-- Layered time graphs -->
+                        <div class="chart-grid-item fill" id="Container-narration-charts">
+                            <span class="text-center mb-4">
+                                <span class="h5 font-weight-bold">Flowrate</span>
+                                <small> 24 hours</small>
+                            </span>
+
+                            <div>
+                                {% for meter in meters %}
+                                    <div class="layered-chart-item {% if not forloop.last %}mb-4{% endif %}">
+                                        <div class="chart-canvas-container">
+                                            <canvas id="LayeredChartCanvas-{{meter.id}}"></canvas>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {{ block.super }} {# block.super renders all the necessary scripts from base.html #}
+    <script src="{% static 'fl_dashboard/vendor/chart.js/Chart.min.js' %}"></script>
+
+    <script>
+        let until = moment.utc();
+        let since = until.clone().subtract(1, 'day');
+        let metersIds = [
+            {% for meter in meters %}
+                {{ meter.id }},
+            {% endfor %}
+        ];
+
+        $.ajax({
+            url:'/api/detected-anomalies/',
+            data: {
+                since: since.toISOString(),
+                until: until.toISOString(),
+                metersIds: metersIds
+            },
+            beforeSend: function() {
+                $('#Spinner').addClass('spinner-border');
+            },
+            success: (response) => {
+                /* response interface
+                response = {
+                    timestamps: [],
+                    metersData:{
+                        meterId1: {
+                            flow: [],
+                            anomalies: []
+                        },
+                        meterId2: {
+                            flow: [],
+                            anomalies: []
+                        }
+                    },
+                }; */
+
+                for(let meterId of Object.keys(response.metersData)) {
+                    renderChart(meterId, {
+                        timestamps: response.timestamps,
+                        flow: response.metersData[meterId].flow,
+                        anomalies: response.metersData[meterId].anomalies,
+                    });
+                }
+            },
+            complete: function() {
+                $('#Spinner').removeClass('spinner-border');
+            }
+        })
+
+        function renderChart(meterId, data){
+            if(!data.anomalies || data.anomalies.length === 0)
+                return;
+
+            let canvasElement = document.getElementById("LayeredChartCanvas-" + meterId);
+
+            let pointBackgroundColors = []
+            for (let i = 0; i < data.anomalies.length; i++) {
+                if(data.anomalies[i]){
+                    pointBackgroundColors.push('black')
+                } else {
+                    pointBackgroundColors.push('#' + CYCLABLE_COLORS.blues[1])
+                }
+            }
+
+            new Chart(canvasElement, {
+                type: 'line',
+                data: {
+                    labels: data.timestamps,
+                    datasets: [
+                        {
+                            label: 'Flow',
+                            data: data.flow,
+                            fill: false,
+                            borderColor: '#' + CYCLABLE_COLORS.blues[1],
+                            pointBackgroundColor: pointBackgroundColors,
+                        },
+                        {
+                            label: 'Anomalies',
+                            data: [],
+                            backgroundColor: 'black',
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    legend: {
+                        display: true
+                    },
+                    title: {
+                        display: false,
+                    },
+                    scales: {
+                        xAxes:[{
+                            type: 'time'
+                        }],
+                    }
+                }
+            });
+
+        }
+    </script>
+{% endblock %}

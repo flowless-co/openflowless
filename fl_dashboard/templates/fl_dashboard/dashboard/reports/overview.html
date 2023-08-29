@@ -1,0 +1,419 @@
+{% extends 'fl_dashboard/dashboard/base.html' %}
+{% load staticfiles %}
+
+{% block title %}Overview Reports{% endblock title %}
+
+{% block content-title %}Overview{% endblock %}
+
+{% block styles %}
+    <style>
+        .chart-grid{
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+        .chart-grid .chart-grid-item{
+            flex: 1 0 260px;
+            display: flex;
+            flex-direction: column;
+            max-width: 500px;
+            min-height: 400px;
+        }
+        .chart-grid .chart-grid-item.fill{
+            flex:0 1 90%;
+            max-width: unset;
+            margin-top: 3em;
+        }
+        .chart-grid .chart-grid-item .chart-canvas-container{
+            flex-grow:1;
+            display: flex;
+        }
+        .chart-canvas-container canvas{
+            min-height: 200px;
+        }
+        #LayeredChartCanvas-narrated_pressure_levels{
+            min-height: 230px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <!-- Consumption Row -->
+    <div class="row">
+
+        <!-- Overview Charts -->
+        <div class="col-sm-12 d-flex">
+            <div class="card shadow mb-4 flex-fill">
+                <div class="card-body mx-3 my-2 d-flex flex-column justify-content-between">
+                    <span class="h5 font-weight-bold text-center mb-4">Overview Charts</span>
+                    <div id="OverviewChartsGrid" class="chart-grid" style="min-height: 500px">
+
+                        <!-- Total Input -->
+                        {% if 'network_input_today' in pies %}
+                            <div class="chart-grid-item" id="Container-network_input_today">
+                            <span class="text-center">
+                                <span class="h5">Network Input</span>
+                                <small>- 30 days</small>
+                            </span>
+                                <div class="chart-canvas-container">
+                                    <canvas id="PieChartCanvas-network_input_today"></canvas>
+                                </div>
+                                <div class="chart-stats">
+                                    <dl class="dyn-statistics">
+                                        <dt class="h6 font-weight-bold">Statistics</dt>
+                                    </dl>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Zonal Consumption -->
+                        {% if 'zone_consumption_today' in pies %}
+                            <div class="chart-grid-item" id="Container-zone_consumption_today">
+                            <span class="text-center df">
+                                <span class="h5">Zone Consumption</span>
+                                <small>- 30 days</small>
+                            </span>
+                                <div class="chart-canvas-container">
+                                    <canvas id="PieChartCanvas-zone_consumption_today"></canvas>
+                                </div>
+                                <div class="chart-stats">
+                                    <dl class="dyn-statistics">
+                                        <dt class="h6 font-weight-bold">Statistics</dt>
+                                    </dl>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Layered time graphs -->
+                        <div class="chart-grid-item fill" id="Container-narration-charts">
+                            <span class="text-center mb-4">
+                                <span class="h5 font-weight-bold">Narrated graphs</span>
+                                <small> 30 days</small>
+                            </span>
+
+                            <div>
+                                {% for chart_name in narration_charts %}
+                                    <div class="layered-chart-item {% if not forloop.last %}mb-4{% endif %}">
+                                        <div class="chart-canvas-container">
+                                            <canvas id="LayeredChartCanvas-{{chart_name}}"></canvas>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="mt-4">
+                                <div class="layered-chart-item">
+                                    <div class="chart-canvas-container">
+                                        <canvas id="LayeredChartCanvas-narrated_pressure_levels"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {{ block.super }} {# block.super renders all the necessary scripts from base.html #}
+    <script src="{% static 'fl_dashboard/vendor/chart.js/Chart.min.js' %}"></script>
+    <script src="{% static 'fl_dashboard/js/charts/line_grapher.js' %}"></script>
+
+    <script>
+        let until = getNow();
+        let since = getNow().subtract(12, 'hours');
+        let pressureChart = null;
+
+        $.ajax({
+            url: '/api/stats/overview',
+            method: 'post',
+            data: JSON.stringify({
+                since: since,
+                until: until,
+                res: 'minutes'
+            }),
+            contentType: 'application/json',
+            success: response => {
+                response = JSON.parse(response);
+                {% comment %}
+                response = {
+                    pies: {
+                        transmission_inflow: {tsm.key: value},
+                        transmission_loss: {tsm.key: value}
+                    },
+                    narrated_charts: {
+                        narrated_network_input: { datetime: value}
+                    }
+                };
+                {% endcomment %}
+                console.log('RECEIVED /api/stats/overview', response);
+
+                // TODO: Dynamic cycled colors
+                let cycledColors = getCycledColors(10);
+                let colorsIndex = 0;
+
+                let x = {
+                    {% if 'network_input_today' in pies %}
+                        total_input: {
+                            consumptionKey: 'transmission_inflow',
+                            lossKey: 'transmission_loss',
+                            containerElemId: 'Container-network_input_today',
+                            canvasId: 'PieChartCanvas-network_input_today'
+                        },
+                    {% endif %}
+                    {% if 'zone_consumption_today' in pies %}
+                        zonal_consumption: {
+                            consumptionKey: 'zone_consumption',
+                            lossKey: 'zone_loss',
+                            containerElemId: 'Container-zone_consumption_today',
+                            canvasId: 'PieChartCanvas-zone_consumption_today'
+                        },
+                    {% endif %}
+                };
+
+                for(let [chartName, options] of Object.entries(x)){
+                    // Total Input Pie Chart
+                    labels = [];
+                    datapoints = [];
+                    colors = [];
+                    for (let [objectLabel, value] of Object.entries(response.pies[options.consumptionKey])) {
+                        labels.push(objectLabel + " Supply");
+                        value = parseFloat(value || 0);
+                        datapoints.push(value);
+
+                        let loss = null;
+                        if(response.pies[options.lossKey][objectLabel] != null){
+                            loss = parseFloat(response.pies[options.lossKey][objectLabel] || 0);
+                            labels.push(objectLabel + " Loss");
+                            datapoints.push(loss);
+                        }
+
+                        let selectedColor = '#' + cycledColors[colorsIndex++];
+                        colors.push(selectedColor);
+                        colors.push(darken(selectedColor, 30));
+                        if(loss == null)
+                            $(`#${options.containerElemId} .dyn-statistics`).append($(`<dd class="mb-1 ml-1">${objectLabel}'s Loss N/A</dd>`));
+                        else{
+                            lossPercentage = trimNumber((loss/(value+loss)) * 100);
+                            $(`#${options.containerElemId} .dyn-statistics`).append($(`<dd class="mb-1 ml-1">${objectLabel}: ${lossPercentage}% Loss</dd>`));
+                        }
+                    }
+                    cfg = Object.assign(
+                        {
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    data: datapoints,
+                                    backgroundColor: colors
+                                }]
+                            }
+                        },
+
+                        {
+                            type: 'doughnut',
+                            options: {
+                                maintainAspectRatio: false,
+                                legend: {
+                                    labels: {
+                                        generateLabels: (chart) => {
+                                            let defaultLabels = Chart.defaults.doughnut.legend.labels.generateLabels(chart);
+                                            let returnList = [];
+
+                                            for(let legendItem of defaultLabels){
+                                                if(legendItem.text.endsWith("Loss"))
+                                                    continue;
+
+                                                if(legendItem.text.endsWith("Supply"))
+                                                    // remove the word supply
+                                                    legendItem.text = legendItem.text.substring(0, legendItem.text.lastIndexOf(" "));
+
+                                                returnList.push(legendItem);
+                                            }
+
+                                            return returnList;
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    );
+                    console.log(chartName, cfg);
+                    new Chart(document.getElementById(options.canvasId), cfg);
+                }
+
+
+                // Narrations
+                let grapherObj = {
+                    // TODO: find a way to hard code `narrated_zone_consumption` in here
+                    labels: Object.keys(response.narrated_charts.narrated_zone_consumption).map(timestamp => moment(timestamp.substring(0, 10)).startOf('day')),
+                    charts: {}
+                };
+                x = {
+                {% if 'narrated_network_input' in narration_charts %}
+                    narrated_network_input: 'input',
+                {% endif %}
+                {% if 'narrated_zone_consumption' in narration_charts %}
+                    narrated_zone_consumption: 'consumption',
+                {% endif %}
+                };
+                for(let [objectKey, label] of Object.entries(x))
+                {
+                    grapherObj.charts[label] = {
+                        canvasElement: document.getElementById('LayeredChartCanvas-' + objectKey),
+                        dataPoints: Object.values(response.narrated_charts[objectKey]).map(value => parseFloat(value))
+                    }
+                }
+
+                console.log("history graph", grapherObj);
+                runLineGrapher(grapherObj);
+            },
+            error: error => {
+                console.error(error);
+            }
+        });
+
+        (function(){
+            let cfg = {
+                type: 'line',
+                data: {
+                    labels: ["2020-07-18", "2020-07-19", "2020-07-20", "2020-07-21", "2020-07-22", "2020-07-23", "2020-07-24", "2020-07-25", "2020-07-26", "2020-07-27", "2020-07-28", "2020-07-29", "2020-07-30", "2020-07-31", "2020-08-01", "2020-08-02", "2020-08-03", "2020-08-04", "2020-08-05", "2020-08-06", "2020-08-07", "2020-08-08", "2020-08-09", "2020-08-10", "2020-08-11", "2020-08-12", "2020-08-13", "2020-08-14", "2020-08-15", "2020-08-16", "2020-08-17"],
+                    datasets: [
+                        {
+                            label: "PTM-200001",
+                            data: ["2.769", "2.745", "7.731", "8.466", "8.553", "7.760", "9.933", "9.980", "9.757", "8.112", "8.912", "8.1", "8.432", "8.458", "8.067", "7.88", "7.88", "7.88", "7.88", "7.423", "8.445", "8.43", "7.425", "8.231", "8.201", "8.201", "8.19", "8.471", "8.039", "8.196", "8.111"],
+                            fill: false,
+                            backgroundColor: '#' + CYCLABLE_COLORS.blues[0],
+                            borderColor: '#' + CYCLABLE_COLORS.blues[0],
+                            cubicInterpolationMode: 'monotone',
+                            pointRadius: 2,
+                        },
+                        {
+                            label: "PTM-200002",
+                            data: [null, null, "11.575", "12.8", "12.9", "9.452", "9.638", "9.702", "9.725", "9.696", "9.7", "9.667", "8.821", "9.187", "9.787", "9.8", "9.685", "9.73", "9.736", "9.371", "9.643", "9.534", "9.623", "9.707", "5.976", "9.652", "9.688", "9.515", "9.626", "8.465", "9.523"],
+                            fill: false,
+                            backgroundColor: '#' + CYCLABLE_COLORS.blues[1],
+                            borderColor: '#' + CYCLABLE_COLORS.blues[1],
+                            cubicInterpolationMode: 'monotone',
+                            pointRadius: 2,
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    legend: {
+                        display: true
+                    },
+                    title: {
+                        display: true,
+                        text: "Avg. Pressure Levels",
+                        position: 'top'
+                    },
+                    scales: {
+                        xAxes:[{
+                            type: 'time',
+                            time:{
+                                unit: 'day',
+                                tooltipFormat:'MM/DD/YYYY'
+                            }
+                        }],
+                        yAxes: [{
+                            ticks: {
+                                maxTicksLimit: 7,
+                            }
+                        }]
+                    }
+                }
+            };
+            new Chart(document.getElementById('LayeredChartCanvas-narrated_pressure_levels'), cfg);
+        })();
+
+        function drawCurrentPressure(){
+            $.ajax({
+                url: '/api/stats/narrated-pressure-levels-overview-data/',
+                method: 'get',
+                contentType: 'application/json',
+                success: function(response){
+                    {% comment %}response = {
+                        xAxisLabels: [],
+                        datasets: [
+                            {
+                                label: '',
+                                data: []
+                            },
+                            {
+                                label: '',
+                                data: []
+                            },
+                        ]
+                    };{% endcomment %}
+                    response = JSON.parse(response);
+                    console.log('RECEIVED /api/stats/narrated-pressure-levels', response);
+
+                    function drawChart(response){
+                        let cfg = {
+                            type: 'line',
+                            data: {
+                                labels: [],
+                                datasets: []
+                            },
+                            options: {
+                                maintainAspectRatio: false,
+                                responsive: true,
+                                legend: {
+                                    display: false
+                                },
+                                title: {
+                                    display: true,
+                                    text: "Avg. Pressure Levels",
+                                    position: 'top'
+                                },
+                                scales: {
+                                    xAxes:[{
+                                        type: 'time',
+                                        time:{
+                                            unit: 'day',
+                                        }
+                                    }],
+                                    yAxes: [{
+                                        ticks: {
+                                            maxTicksLimit: 7,
+                                        },
+                                    }]
+                                }
+                            }
+                        };
+
+                        cfg.data['labels'] = response.xAxisLabels;
+
+                        let idx = 0;
+                        for (let dataset of response.datasets){
+                            cfg.data.datasets.push({
+                                label: dataset.label,
+                                data: dataset.data,
+                                fill: false,
+                                backgroundColor: '#' + CYCLABLE_COLORS.blues[idx],
+                                borderColor: '#' + CYCLABLE_COLORS.blues[idx],
+                                cubicInterpolationMode: 'monotone',
+                                pointRadius: 2,
+                            });
+                            idx++;
+                        }
+
+                        if(pressureChart)
+                            pressureChart.destroy();
+
+                        pressureChart = new Chart(document.getElementById('LayeredChartCanvas-narrated_pressure_levels'), cfg);
+                    }
+
+                    drawChart(response);
+                }
+            })
+        }
+
+    </script>
+{% endblock %}
